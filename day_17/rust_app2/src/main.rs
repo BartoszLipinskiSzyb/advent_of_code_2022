@@ -7,7 +7,7 @@ fn print_chamber(chamber: &Vec<Vec<char>>, height_limit: i32) {
 }
 
 fn main() {
-    let jet_streams = fs::read_to_string("input").unwrap().replace("\n", "");
+    let jet_streams = fs::read_to_string("test").unwrap().replace("\n", "");
 
     let input_rocks = fs::read_to_string("rocks").unwrap();
     let rock_strings: Vec<&str> = input_rocks.split("\r\n\r\n").collect();
@@ -17,7 +17,8 @@ fn main() {
 
     let chamber_width = 7;
     let mut chamber: Vec<Vec<bool>> = vec![vec![false; chamber_width]; 4096];
-    let mut highest_rock = 0;
+    let mut highest_rock_test = 0;
+    let mut last_highest_rock_test = 0;
     let mut current_second = 0;
 
     let mut rock_backup: Vec<(i32, i32)>;
@@ -25,14 +26,6 @@ fn main() {
     for rock_id in 0..2022 {
         let rock_shape = &rocks[rock_id % rocks.len()];
         
-        for (i, layer) in chamber.iter().enumerate() {
-            if !layer.contains(&true) {
-                highest_rock = i;
-                // println!("{}", highest_rock);
-                break;
-            }
-        }
-
         // spawn rock
         let mut curr_rock: Vec<(i32, i32)> = vec![];
 
@@ -41,10 +34,13 @@ fn main() {
                 if rock_shape[y].chars().nth(x).unwrap() == '#' {
                     // chamber[(rock_shape.len() as i32 + highest_rock as i32 - y as i32 + 2) as usize][x + 2] = '@';
 
-                    curr_rock.push(((x + 2) as i32, (rock_shape.len() as i32 + highest_rock as i32 - y as i32 + 2)));
+                    curr_rock.push(((x + 2) as i32, (rock_shape.len() as i32 + highest_rock_test as i32 - y as i32 + 2)));
                 }
             }
         }
+
+        last_highest_rock_test = highest_rock_test;
+        highest_rock_test += 3 + rock_shape.len();
 
         let mut stopped = false;
         while !stopped {
@@ -99,6 +95,10 @@ fn main() {
                     break;
                 }
             }
+
+            if !stopped && highest_rock_test > last_highest_rock_test {
+                highest_rock_test -= 1;
+            }
             
             // let mut gorol = String::new();
             // io::stdin().read_line(&mut gorol).unwrap();
@@ -111,13 +111,5 @@ fn main() {
         }
     }
 
-
-    for (i, layer) in chamber.iter().enumerate() {
-        if !layer.contains(&true) {
-            highest_rock = i;
-            println!("{}", highest_rock);
-            break;
-        }
-    }
-    println!("Height: {}", highest_rock);
+    println!("Height: {}", highest_rock_test);
 }
