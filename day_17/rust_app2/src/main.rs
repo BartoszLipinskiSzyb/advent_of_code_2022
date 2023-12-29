@@ -1,40 +1,84 @@
-use std::{fs, io};
+use std::fs;
 
-fn print_chamber(chamber: &Vec<Vec<char>>, height_limit: i32) {
-    for y in 0..height_limit {
-        println!("{:?}", chamber[(height_limit - y - 1) as usize])
+fn true_modulo(x: i64, modulo: i64) -> i64 {
+    let mut result = x;
+
+    while result < 0 {
+        result += modulo;
+    }
+
+    return result % modulo;
+}
+
+fn print_chamber(chamber: &Vec<Vec<bool>>, start: i64, height_limit: i64, points: &Vec<(i64, i64)>, chamber_height: i64) {
+    for y in start..height_limit {
+        let y_mod = true_modulo(height_limit - y - 1, chamber_height) as usize;
+        for x in 0..7{
+            if chamber[y_mod][x]{
+                print!("#");    
+            } else {
+                if points.contains(&(x as i64, y_mod as i64)) {
+                    print!("@");
+                } else {
+                    print!(".");
+                }
+            }
+        }
+        println!();
     }
 }
 
 fn main() {
-    let jet_streams = fs::read_to_string("test").unwrap().replace("\n", "");
+    let jet_streams = fs::read_to_string("input").unwrap().replace("\n", "");
 
     let input_rocks = fs::read_to_string("rocks").unwrap();
     let rock_strings: Vec<&str> = input_rocks.split("\r\n\r\n").collect();
     let rocks: Vec<Vec<&str>> = rock_strings.iter().map(|rock| rock.split("\r\n").collect::<Vec<&str>>()).collect::<Vec<Vec<&str>>>();
 
+    // let highest_rock_size = rocks.iter().map(|rock| rock.len()).max().unwrap();
+
     // println!("{:?}", rocks);
 
     let chamber_width = 7;
-    let mut chamber: Vec<Vec<bool>> = vec![vec![false; chamber_width]; 4096];
+    let chamber_height = 512;
+    let mut chamber: Vec<Vec<bool>> = vec![vec![false; chamber_width]; chamber_height];
+    chamber[chamber_height - 1] = vec![true; chamber_width];
+
     let mut highest_rock_test = 0;
-    let mut last_highest_rock_test = 0;
+    let mut last_highest_rock_test;
+
+    // let rock_limit = jet_streams.len() * rocks.len();
+
+    // let test_startback = 10;
+    // let mut current_second = rock_limit - rocks.len() * test_startback;
     let mut current_second = 0;
 
-    let mut rock_backup: Vec<(i32, i32)>;
+    let mut rock_backup: Vec<(i64, i64)>;
+    let mut rock_shape;
+    let mut curr_rock: Vec<(i64, i64)>;
+    let mut stopped;
+    let mut y_mod;
+    let mut is_pushing_left;
 
-    for rock_id in 0..2022 {
-        let rock_shape = &rocks[rock_id % rocks.len()];
-        
+    let mut movements: Vec<char> = vec![];
+
+    let rock_limit = 10000000;
+    for rock_id in 0..rock_limit {
+        rock_shape = &rocks[rock_id % rocks.len()];
+       
         // spawn rock
-        let mut curr_rock: Vec<(i32, i32)> = vec![];
+        curr_rock = vec![];
 
         for y in 0..rock_shape.len(){
+            y_mod = true_modulo(rock_shape.len() as i64 + highest_rock_test as i64 - y as i64 + 2, chamber_height as i64);
+            for x in 0..chamber_width {
+                chamber[y_mod as usize][x] = false;
+            }
             for x in 0..rock_shape[y].len(){
                 if rock_shape[y].chars().nth(x).unwrap() == '#' {
-                    // chamber[(rock_shape.len() as i32 + highest_rock as i32 - y as i32 + 2) as usize][x + 2] = '@';
+                    // chamber[(rock_shape.len() as i64 + highest_rock as i64 - y as i64 + 2) as usize][x + 2] = '@';
 
-                    curr_rock.push(((x + 2) as i32, (rock_shape.len() as i32 + highest_rock_test as i32 - y as i32 + 2)));
+                    curr_rock.push(((x + 2) as i64, y_mod));
                 }
             }
         }
@@ -42,9 +86,10 @@ fn main() {
         last_highest_rock_test = highest_rock_test;
         highest_rock_test += 3 + rock_shape.len();
 
-        let mut stopped = false;
+
+        stopped = false;
         while !stopped {
-            let is_pushing_left: bool = jet_streams.chars().nth(current_second % jet_streams.len()).unwrap() == '<';
+            is_pushing_left = jet_streams.chars().nth(current_second % jet_streams.len()).unwrap() == '<';
             // println!("{}", is_pushing_left);            
             rock_backup = curr_rock.clone();
             if is_pushing_left {
@@ -53,8 +98,9 @@ fn main() {
                         curr_rock = rock_backup.clone();
                         break;
                     }
-                    if chamber[point.1 as usize][(point.0 - 1) as usize] == false {
+                    if chamber[point.1 as usize % chamber_height][(point.0 - 1) as usize] == false {
                         point.0 -= 1;
+                        movements.push('<');
                     } else {
                         // println!("Left block");
                         curr_rock = rock_backup.clone();
@@ -63,11 +109,12 @@ fn main() {
                 }
             } else {
                 for point in &mut curr_rock {
-                    if point.0 == 6 {
+                    if point.0 == chamber_width as i64 - 1 {
                         curr_rock = rock_backup.clone();
                         break;
                     }
-                    if chamber[point.1 as usize][(point.0 + 1) as usize] == false {
+                    if chamber[point.1 as usize % chamber_height][(point.0 + 1) as usize] == false {
+                        movements.push('>');
                         point.0 += 1;
                     } else {
                         // println!("Left block");
@@ -81,13 +128,9 @@ fn main() {
             rock_backup = curr_rock.clone();
 
             for point in &mut curr_rock {
-                if point.1 == 0 {
-                    curr_rock = rock_backup.clone();
-                    stopped = true;
-                    break;
-                }
-                if chamber[(point.1 - 1) as usize][point.0 as usize] == false {
-                    point.1 -= 1;
+                if chamber[true_modulo(point.1 - 1, chamber_height as i64) as usize][point.0 as usize] == false {
+                    movements.push('v');
+                    point.1 = true_modulo(point.1 - 1, chamber_height as i64);
                 } else {
                     // println!("Left block");
                     curr_rock = rock_backup.clone();
@@ -99,16 +142,23 @@ fn main() {
             if !stopped && highest_rock_test > last_highest_rock_test {
                 highest_rock_test -= 1;
             }
-            
-            // let mut gorol = String::new();
-            // io::stdin().read_line(&mut gorol).unwrap();
-            // print_chamber(&chamber, 20);
+            //println!("{}", highest_rock_test);
+
             current_second += 1;
         }
 
         for point in curr_rock {
             chamber[point.1 as usize][point.0 as usize] = true;
         }
+    }
+
+    'outer: for cycle_length in 1..rock_limit{
+        for i in 0..cycle_length{
+            if movements[i] != movements[i + cycle_length] {
+                continue 'outer;
+            }
+        }
+        println!("cycle: {}", cycle_length);
     }
 
     println!("Height: {}", highest_rock_test);
